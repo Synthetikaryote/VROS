@@ -10,6 +10,7 @@ using UnityEngine.Networking;
 public class Main : MonoBehaviour
 {
     public string directoryPath;
+    public Transform mosaic;
 
     // Use this for initialization
     async void Start()
@@ -29,7 +30,7 @@ public class Main : MonoBehaviour
         var pixelHeight = 8096;
         var minImageHeight = 1024;
         var maxImageHeight = 2048;
-        var scale = 0.0004f;
+        var scale = 0.0008f;
         var z = 0;
         var y = pixelHeight;
         var colWidth = 0;
@@ -117,7 +118,8 @@ public class Main : MonoBehaviour
         var hw = texture.width * 0.5f;
         var hh = texture.height * 0.5f;
         var transform = go.GetComponent<Transform>();
-        transform.position = position;
+        transform.parent = mosaic;
+        transform.localPosition = position;
         transform.forward = Vector3.forward;
         transform.localScale = Vector3.one * scale;
         transform.localEulerAngles = eulerAngles;

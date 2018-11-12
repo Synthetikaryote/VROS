@@ -3,19 +3,22 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public class LaserPointer : MonoBehaviour {
-    private SteamVR_TrackedObject trackedObj;
     public GameObject laserPrefab;
-    private GameObject laser;
-    private Transform laserTransform;
-    private Vector3 hitPoint;
+    public Transform mosaic;
     public Transform cameraRigTransform;
     public GameObject teleportReticlePrefab;
-    private GameObject reticle;
-    private Transform teleportReticleTransform;
     public Transform headTransform;
     public Vector3 teleportReticleOffset;
     public LayerMask teleportMask;
+    private SteamVR_TrackedObject trackedObj;
+    private GameObject laser;
+    private Transform laserTransform;
+    private Vector3 hitPoint;
+    private GameObject reticle;
+    private Transform teleportReticleTransform;
     private bool shouldTeleport;
+    private float startPitchDelta, startYawDelta;
+    private Vector3 startMosaicPosition;
 
     private SteamVR_Controller.Device Controller
     {
@@ -53,6 +56,20 @@ public class LaserPointer : MonoBehaviour {
         if (Controller.GetPressDown(SteamVR_Controller.ButtonMask.Trigger) && shouldTeleport)
         {
             Teleport();
+        }
+
+        if (Controller.GetPressDown(SteamVR_Controller.ButtonMask.Grip))
+        {
+            startPitchDelta = Mathf.Tan(-transform.eulerAngles.x * Mathf.Deg2Rad);
+            startYawDelta = Mathf.Tan((transform.eulerAngles.y - 90f) * Mathf.Deg2Rad);
+            startMosaicPosition = mosaic.localPosition;
+        }
+
+        if (Controller.GetPress(SteamVR_Controller.ButtonMask.Grip))
+        {
+            mosaic.position = startMosaicPosition
+                + Vector3.up * (Mathf.Tan(-transform.eulerAngles.x * Mathf.Deg2Rad) - startPitchDelta)
+                + Vector3.forward * (Mathf.Tan((transform.eulerAngles.y - 90f) * Mathf.Deg2Rad) - startYawDelta);
         }
     }
 
