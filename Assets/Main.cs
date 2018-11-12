@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -13,7 +14,14 @@ public class Main : MonoBehaviour
     // Use this for initialization
     async void Start()
     {
-        await this.LoadDirectory(this.directoryPath);
+        try
+        {
+            await this.LoadDirectory(this.directoryPath);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Exception: {ex.Message}\n{ex.StackTrace}");
+        }
     }
 
     // Update is called once per frame
@@ -25,28 +33,56 @@ public class Main : MonoBehaviour
     async Task LoadDirectory(string directory)
     {
         var files = Directory.GetFiles(directory).ToList();
-        var count = files.Count;
-        var rows = 4;
-        var rowHeight = 0.6f;
-        var width = 0.4f;
-        await Task.WhenAll(files.Select(async (path, i) =>
+        var pixelHeight = 8096;
+        var minImageHeight = 1024;
+        var maxImageHeight = 2048;
+        var scale = 0.0004f;
+        var z = 0;
+        var y = pixelHeight;
+        var colWidth = 0;
+        foreach (var file in files)
         {
-            var texture = await LoadTextureFromPath(path);
-            var scale = width / texture.width;
-            var halfCount = count / 2;
-            var sideIndex = i % halfCount;
-            var columns = halfCount / rows;
-            var column = sideIndex % columns;
-            var row = sideIndex / columns;
-            var position = new Vector3((1f + row * 0.01f) * (i < halfCount ? -1f : 1f), 0.7f + rows * 0.5f * rowHeight - row * rowHeight, column * width);
-            var angles = new Vector3(0f, i < halfCount ? -90f : 90f, 0f);
-            CreateImage(texture, Path.GetFileName(path), position, angles, scale);
-        }));
+            try
+            {
+                Debug.Log(file);
+                var texture = await LoadTextureFromPath(file);
+                if (texture == null)
+                {
+                    continue;
+                }
+
+                // new column?
+                if (y - texture.height < 0)
+                {
+                    y = pixelHeight;
+                    z += colWidth;
+                    colWidth = 0;
+                }
+                var imageScale = 1f;
+                if (texture.height > maxImageHeight)
+                    imageScale = maxImageHeight / (float)texture.height;
+                if (texture.height < minImageHeight)
+                    imageScale = minImageHeight / (float)texture.height;
+                var w = Mathf.FloorToInt(texture.width * imageScale);
+                var h = Mathf.FloorToInt(texture.height * imageScale);
+                CreateImage(texture, Path.GetFileName(file),
+                    new Vector3(-1f, 1f + (y - h / 2 - pixelHeight / 2) * scale, (z + w / 2) * scale),
+                    new Vector3(0f, -90f, 0f),
+                    imageScale * scale);
+                colWidth = Mathf.Max(colWidth, w);
+                y -= h;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError(ex.Message);
+            }
+        }
     }
 
     async Task<Texture2D> LoadTextureFromPath(string path)
     {
-        var www = UnityWebRequestTexture.GetTexture($"file://{path}");
+        path = Path.Combine(Path.GetDirectoryName(path), WWW.EscapeURL(Path.GetFileName(path)));
+        var www = UnityWebRequestTexture.GetTexture($@"file://{path}");
         await www.SendWebRequest();
         if (www.isNetworkError)
         {
@@ -58,7 +94,12 @@ public class Main : MonoBehaviour
         {
             await new WaitForSecondsRealtime(0.1f);
         }
-        return downloadHandler.texture;
+        var texture = downloadHandler.texture;
+        if (texture == null)
+        {
+            Debug.LogWarning($"couldn't load {path}");
+        }
+        return texture;
     }
 
     GameObject CreateImage(Texture2D texture, string name, Vector3 position, Vector3 eulerAngles, float scale)
