@@ -14,14 +14,7 @@ public class Main : MonoBehaviour
     // Use this for initialization
     async void Start()
     {
-        try
-        {
-            await this.LoadDirectory(this.directoryPath);
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError($"Exception: {ex.Message}\n{ex.StackTrace}");
-        }
+        await this.LoadDirectory2(this.directoryPath);
     }
 
     // Update is called once per frame
@@ -42,41 +35,55 @@ public class Main : MonoBehaviour
         var colWidth = 0;
         foreach (var file in files)
         {
-            try
+            var texture = await LoadTextureFromPath(file);
+            if (texture == null)
             {
-                Debug.Log(file);
-                var texture = await LoadTextureFromPath(file);
-                if (texture == null)
-                {
-                    continue;
-                }
+                continue;
+            }
 
-                // new column?
-                if (y - texture.height < 0)
-                {
-                    y = pixelHeight;
-                    z += colWidth;
-                    colWidth = 0;
-                }
-                var imageScale = 1f;
-                if (texture.height > maxImageHeight)
-                    imageScale = maxImageHeight / (float)texture.height;
-                if (texture.height < minImageHeight)
-                    imageScale = minImageHeight / (float)texture.height;
-                var w = Mathf.FloorToInt(texture.width * imageScale);
-                var h = Mathf.FloorToInt(texture.height * imageScale);
-                CreateImage(texture, Path.GetFileName(file),
-                    new Vector3(-1f, 1f + (y - h / 2 - pixelHeight / 2) * scale, (z + w / 2) * scale),
-                    new Vector3(0f, -90f, 0f),
-                    imageScale * scale);
-                colWidth = Mathf.Max(colWidth, w);
-                y -= h;
-            }
-            catch (Exception ex)
+            // new column?
+            if (y - texture.height < 0)
             {
-                Debug.LogError(ex.Message);
+                y = pixelHeight;
+                z += colWidth;
+                colWidth = 0;
             }
+            var imageScale = 1f;
+            if (texture.height > maxImageHeight)
+                imageScale = maxImageHeight / (float)texture.height;
+            if (texture.height < minImageHeight)
+                imageScale = minImageHeight / (float)texture.height;
+            var w = Mathf.FloorToInt(texture.width * imageScale);
+            var h = Mathf.FloorToInt(texture.height * imageScale);
+            CreateImage(texture, Path.GetFileName(file),
+                new Vector3(-1f, 1f + (y - h / 2 - pixelHeight / 2) * scale, (z + w / 2) * scale),
+                new Vector3(0f, -90f, 0f),
+                imageScale * scale);
+            colWidth = Mathf.Max(colWidth, w);
+            y -= h;
         }
+    }
+
+    async Task LoadDirectory2(string directory)
+    {
+        var files = Directory.GetFiles(directory).ToList();
+        var scale = 0.0005f;
+        var xs = new float[16];
+        foreach (var file in files)
+        {
+            var texture = await LoadTextureFromPath(file);
+
+            var base2 = Mathf.RoundToInt(Mathf.Log(texture.height, 2f));
+            var h = Mathf.FloorToInt(Mathf.Pow(2f, base2));
+            var s = h / (float)texture.height;
+            var w = texture.width * s;
+
+            CreateImage(texture, Path.GetFileName(file),
+                new Vector3(-1, (h + h / 2) * scale - 0.5f, (xs[base2] + w * 0.5f) * scale),
+                new Vector3(0f, -90f, 0f), scale * s * 0.9f);
+            xs[base2] += w;
+        }
+
     }
 
     async Task<Texture2D> LoadTextureFromPath(string path)
