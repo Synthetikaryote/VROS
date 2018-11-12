@@ -26,9 +26,9 @@ public class Main : MonoBehaviour
     {
         var files = Directory.GetFiles(directory).ToList();
         var count = files.Count;
-        var rows = 5;
-        var rowHeight = 0.4f;
-        var width = 0.2f;
+        var rows = 4;
+        var rowHeight = 0.6f;
+        var width = 0.4f;
         await Task.WhenAll(files.Select(async (path, i) =>
         {
             var texture = await LoadTextureFromPath(path);
@@ -38,7 +38,7 @@ public class Main : MonoBehaviour
             var columns = halfCount / rows;
             var column = sideIndex % columns;
             var row = sideIndex / columns;
-            var position = new Vector3(1f * (i < halfCount ? -1f : 1f), 0.7f + rows * 0.5f * rowHeight - row * rowHeight, column * width);
+            var position = new Vector3((1f + row * 0.01f) * (i < halfCount ? -1f : 1f), 0.7f + rows * 0.5f * rowHeight - row * rowHeight, column * width);
             var angles = new Vector3(0f, i < halfCount ? -90f : 90f, 0f);
             CreateImage(texture, Path.GetFileName(path), position, angles, scale);
         }));
