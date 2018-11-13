@@ -15,7 +15,7 @@ public class Main : MonoBehaviour
     // Use this for initialization
     async void Start()
     {
-        await this.LoadDirectory2(this.directoryPath);
+        await this.LoadDirectory(this.directoryPath);
     }
 
     // Update is called once per frame
@@ -24,57 +24,20 @@ public class Main : MonoBehaviour
 
     }
 
-    async Task LoadDirectory(string directory)
+    public async Task LoadDirectory(string directory)
     {
+        directoryPath = directory;
+        ClearMosaic();
         var files = Directory.GetFiles(directory).ToList();
-        var pixelHeight = 8096;
-        var minImageHeight = 1024;
-        var maxImageHeight = 2048;
-        var scale = 0.0008f;
-        var z = 0;
-        var y = pixelHeight;
-        var colWidth = 0;
-        foreach (var file in files)
-        {
-            var texture = await LoadTextureFromPath(file);
-            if (texture == null)
-            {
-                continue;
-            }
-
-            // new column?
-            if (y - texture.height < 0)
-            {
-                y = pixelHeight;
-                z += colWidth;
-                colWidth = 0;
-            }
-            var imageScale = 1f;
-            if (texture.height > maxImageHeight)
-                imageScale = maxImageHeight / (float)texture.height;
-            if (texture.height < minImageHeight)
-                imageScale = minImageHeight / (float)texture.height;
-            var w = Mathf.FloorToInt(texture.width * imageScale);
-            var h = Mathf.FloorToInt(texture.height * imageScale);
-            CreateImage(texture, Path.GetFileName(file),
-                new Vector3(-1f, 1f + (y - h / 2 - pixelHeight / 2) * scale, (z + w / 2) * scale),
-                new Vector3(0f, -90f, 0f),
-                imageScale * scale);
-            colWidth = Mathf.Max(colWidth, w);
-            y -= h;
-        }
-    }
-
-    async Task LoadDirectory2(string directory)
-    {
-        var files = Directory.GetFiles(directory).ToList();
-        var scale = 0.0005f;
+        var scale = 0.001f;
         var xs = new float[16];
         foreach (var file in files)
         {
             var texture = await LoadTextureFromPath(file);
+            if (!Application.isPlaying) break;
+            if (texture == null) continue;
 
-            var base2 = Mathf.RoundToInt(Mathf.Log(texture.height, 2f));
+            var base2 = Mathf.CeilToInt(Mathf.Log(texture.height, 2f));
             var h = Mathf.FloorToInt(Mathf.Pow(2f, base2));
             var s = h / (float)texture.height;
             var w = texture.width * s;
@@ -84,7 +47,14 @@ public class Main : MonoBehaviour
                 new Vector3(0f, -90f, 0f), scale * s * 0.9f);
             xs[base2] += w;
         }
+    }
 
+    void ClearMosaic()
+    {
+        foreach (Transform transform in mosaic.transform)
+        {
+            Destroy(transform.gameObject);
+        }
     }
 
     async Task<Texture2D> LoadTextureFromPath(string path)
@@ -92,6 +62,8 @@ public class Main : MonoBehaviour
         path = Path.Combine(Path.GetDirectoryName(path), WWW.EscapeURL(Path.GetFileName(path)));
         var www = UnityWebRequestTexture.GetTexture($@"file://{path}");
         await www.SendWebRequest();
+        if (!Application.isPlaying)
+            return null;
         if (www.isNetworkError)
         {
             Debug.LogError($"error loading {path}: {www.error}");

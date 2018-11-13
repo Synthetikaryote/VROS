@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 
 public class LaserPointer : MonoBehaviour {
@@ -10,6 +11,7 @@ public class LaserPointer : MonoBehaviour {
     public Transform headTransform;
     public Vector3 teleportReticleOffset;
     public LayerMask teleportMask;
+    public Main main;
     private SteamVR_TrackedObject trackedObj;
     private GameObject laser;
     private Transform laserTransform;
@@ -70,6 +72,11 @@ public class LaserPointer : MonoBehaviour {
             mosaic.position = startMosaicPosition
                 + Vector3.up * (Mathf.Tan(-transform.eulerAngles.x * Mathf.Deg2Rad) - startPitchDelta)
                 + Vector3.forward * (Mathf.Tan((transform.eulerAngles.y - 90f) * Mathf.Deg2Rad) - startYawDelta);
+        }
+
+        if (Controller.GetPressDown(SteamVR_Controller.ButtonMask.ApplicationMenu))
+        {
+            main.LoadDirectory(new DirectoryInfo(main.directoryPath).Parent.FullName);
         }
     }
 
