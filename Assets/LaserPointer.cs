@@ -10,17 +10,18 @@ public class LaserPointer : MonoBehaviour {
     public GameObject teleportReticlePrefab;
     public Transform headTransform;
     public Vector3 teleportReticleOffset;
-    public LayerMask teleportMask;
+    public LayerMask teleportMask, portalMask;
     public Main main;
     private SteamVR_TrackedObject trackedObj;
     private GameObject laser;
     private Transform laserTransform;
-    private Vector3 hitPoint;
+    private Vector3 teleportPoint;
     private GameObject reticle;
     private Transform teleportReticleTransform;
-    private bool shouldTeleport;
-    private float startPitchDelta, startYawDelta;
+    private float startPitchDelta, startYawDelta, startRigYaw;
     private Vector3 startMosaicPosition;
+    private Vector3 startRigEulerAngles;
+    private Portal currentPortal = null;
 
     private SteamVR_Controller.Device Controller
     {
@@ -40,24 +41,25 @@ public class LaserPointer : MonoBehaviour {
     }
 	
 	void Update () {
-        RaycastHit hit;
-        if (Physics.Raycast(trackedObj.transform.position, transform.forward, out hit, 100, teleportMask))
+        bool shouldTeleport = false;
+        if (!RaycastPortal())
         {
-            hitPoint = hit.point;
-            ShowLaser(hit);
-            reticle.SetActive(true);
-            teleportReticleTransform.position = hitPoint + teleportReticleOffset;
-            shouldTeleport = true;
-        }
-        else
-        {
-            laser.SetActive(false);
-            reticle.SetActive(false);
+            shouldTeleport = RaycastFloor();
         }
 
         if (Controller.GetPressDown(SteamVR_Controller.ButtonMask.Trigger) && shouldTeleport)
         {
             Teleport();
+        }
+
+        if (Controller.GetPressDown(SteamVR_Controller.ButtonMask.Trigger) && currentPortal != null)
+        {
+            main.LoadDirectory(currentPortal.FilePath);
+        }
+
+        if (Controller.GetPressDown(SteamVR_Controller.ButtonMask.ApplicationMenu))
+        {
+            main.ResetPosition();
         }
 
         if (Controller.GetPressDown(SteamVR_Controller.ButtonMask.Grip))
@@ -74,27 +76,77 @@ public class LaserPointer : MonoBehaviour {
                 + Vector3.forward * (Mathf.Tan((transform.eulerAngles.y - 90f) * Mathf.Deg2Rad) - startYawDelta);
         }
 
-        if (Controller.GetPressDown(SteamVR_Controller.ButtonMask.ApplicationMenu))
+        if (Controller.GetPressDown(SteamVR_Controller.ButtonMask.Touchpad))
         {
-            main.LoadDirectory(new DirectoryInfo(main.directoryPath).Parent.FullName);
+            startRigYaw = transform.localEulerAngles.y;
+            startRigEulerAngles = cameraRigTransform.localEulerAngles;
+        }
+        if (Controller.GetPress(SteamVR_Controller.ButtonMask.Touchpad))
+        {
+            cameraRigTransform.localEulerAngles = startRigEulerAngles + Vector3.up * -(transform.localEulerAngles.y - startRigYaw);
+        }
+    }
+
+    private bool RaycastPortal()
+    {
+        RaycastHit hit;
+        Portal portal = null;
+        if (Physics.Raycast(trackedObj.transform.position, transform.forward, out hit, 100f, portalMask))
+        {
+            portal = hit.collider.gameObject.GetComponent<Portal>();
+            ShowLaser(hit);
+        }
+        else
+        {
+            if (currentPortal != null)
+                currentPortal.Highlight = false;
+            currentPortal = null;
+        }
+        if (portal != null && portal != currentPortal)
+        {
+            if (currentPortal != null)
+                currentPortal.Highlight = false;
+            currentPortal = portal;
+            currentPortal.Highlight = true;
+            reticle.SetActive(false);
+            portal.Highlight = true;
+        }
+        return currentPortal != null;
+    }
+
+    private bool RaycastFloor()
+    {
+        RaycastHit hit;
+        if (Physics.Raycast(trackedObj.transform.position, transform.forward, out hit, 100, teleportMask))
+        {
+            teleportPoint = hit.point;
+            ShowLaser(hit);
+            reticle.SetActive(true);
+            teleportReticleTransform.position = teleportPoint + teleportReticleOffset;
+            return true;
+        }
+        else
+        {
+            laser.SetActive(false);
+            reticle.SetActive(false);
+            return false;
         }
     }
 
     private void ShowLaser(RaycastHit hit)
     {
         laser.SetActive(true);
-        laserTransform.position = Vector3.Lerp(trackedObj.transform.position, hitPoint, .5f);
-        laserTransform.LookAt(hitPoint);
+        laserTransform.position = Vector3.Lerp(trackedObj.transform.position, hit.point, .5f);
+        laserTransform.LookAt(hit.point);
         laserTransform.localScale = new Vector3(laserTransform.localScale.x, laserTransform.localScale.y,
             hit.distance);
     }
 
     private void Teleport()
     {
-        shouldTeleport = false;
         reticle.SetActive(false);
         Vector3 difference = cameraRigTransform.position - headTransform.position;
         difference.y = 0;
-        cameraRigTransform.position = hitPoint + difference;
+        cameraRigTransform.position = teleportPoint + difference;
     }
 }
